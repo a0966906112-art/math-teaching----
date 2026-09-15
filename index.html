@@ -2,116 +2,88 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>雙側邊轉動與三角形示範</title>
+    <title>雙側邊轉動與三角形示範（極限防超界與大數值修正版）</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
-            background-color: #f7f9fb;
+            background-color: #f2f5f9;
             margin: 0;
-            padding: 20px;
+            padding: 10px;
+            box-sizing: border-box;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            overflow: hidden;
         }
         h1 {
             color: #2c3e50;
-            font-size: 28px;
-            margin-bottom: 5px;
+            font-size: 22px;
+            margin: 2px 0;
         }
-        p {
-            color: #555;
-            font-size: 18px;
-            margin-bottom: 15px;
+        canvas {
+            background-color: #fff;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            cursor: crosshair;
+            display: block;
+            width: 95vw;
+            max-width: 1300px;
+            flex-grow: 1;
+            margin: 5px 0;
         }
         .control-panel {
-            margin-bottom: 20px;
             background: #fff;
-            display: inline-block;
-            padding: 15px 30px;
+            padding: 10px 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-            font-size: 18px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+            font-size: 16px;
+            margin-bottom: 5px;
         }
         .control-panel label {
-            margin: 0 10px;
+            margin: 0 8px;
             font-weight: bold;
         }
         .control-panel input {
-            width: 70px;
-            padding: 8px;
-            font-size: 18px;
+            width: 75px;
+            padding: 5px;
+            font-size: 16px;
             text-align: center;
             margin-left: 5px;
         }
         .control-panel button {
-            padding: 8px 18px;
-            font-size: 18px;
+            padding: 6px 16px;
+            font-size: 16px;
             background-color: #3498db;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin-left: 15px;
+            margin-left: 10px;
         }
         .control-panel button:hover {
             background-color: #2980b9;
-        }
-        canvas {
-            background-color: #fff;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            cursor: crosshair;
-            display: block;
-            margin: 0 auto;
-        }
-        .info-panel {
-            margin: 25px auto 0 auto;
-            font-size: 20px;
-            background: #fff;
-            display: inline-block;
-            padding: 20px 35px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            text-align: left;
-            max-width: 1100px;
-            width: 1100px;
-            box-sizing: border-box;
-            line-height: 1.6;
-        }
-        .valid {
-            color: #27ae60;
-            font-weight: bold;
-        }
-        .invalid {
-            color: #c0392b;
-            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-    <h1>雙側邊轉動與兩邊和三角示範</h1>
-    <p>底邊固定在兩端。拖曳兩側邊頂端旋轉；當兩端點互相靠近時會自動吸附接合，也能隨時再拉開！</p>
+    <h1>雙側邊轉動與三角形示範</h1>
     
+    <canvas id="canvas"></canvas>
+
     <div class="control-panel">
         <label style="color: #2980b9;">底邊 c: <input type="number" id="inputC" value="15" min="1"></label>
         <label style="color: #27ae60;">左側邊 b: <input type="number" id="inputB" value="10" min="1"></label>
         <label style="color: #e67e22;">右側邊 a: <input type="number" id="inputA" value="8" min="1"></label>
         <button onclick="initSides()">設定邊長</button>
     </div>
-    <br>
-    
-    <!-- 將畫布尺寸大幅放大 -->
-    <canvas id="canvas" width="1100" height="700"></canvas>
-
-    <div class="info-panel" id="info">
-        載入中...
-    </div>
 
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const infoDiv = document.getElementById('info');
-
-const SCALE = 45; // 比例尺再次放大，使圖形在放大後的畫布中更具份量
 
 let c_len = 15; 
 let b_len = 10; 
@@ -130,6 +102,22 @@ let thetaD = -3 * Math.PI / 4;
 let isSnapped = false;
 let draggingPoint = null; 
 
+function updateCanvasSize() {
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+}
+
+// 更加嚴謹的動態縮放：預留足夠頂部與左右邊距，確保大數字打直也絕不超出畫面
+function getDynamicScale() {
+    updateCanvasSize();
+    let maxW = c_len + b_len + a_len; 
+    let maxH = b_len + a_len;          
+
+    let scaleX = (canvas.width - 140) / maxW;
+    let scaleY = (canvas.height - 140) / maxH;
+    return Math.max(2, Math.min(scaleX, scaleY));
+}
+
 function initSides() {
     c_len = parseFloat(document.getElementById('inputC').value);
     b_len = parseFloat(document.getElementById('inputB').value);
@@ -139,15 +127,6 @@ function initSides() {
         alert('請輸入大於 0 的有效數字！');
         return;
     }
-
-    let totalWidthPx = c_len * SCALE;
-    let startX = (canvas.width - totalWidthPx) / 2;
-    let startY = 480; // 配合大型畫布向下調整基準線
-
-    A.x = startX;
-    A.y = startY;
-    B.x = startX + totalWidthPx;
-    B.y = startY;
 
     thetaC = -Math.PI / 3;
     thetaD = -2 * Math.PI / 3;
@@ -169,7 +148,19 @@ function solveTriangleAngles(a, b, c) {
 }
 
 function draw() {
+    let SCALE = getDynamicScale();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    let totalWidthPx = c_len * SCALE;
+    
+    // 底邊置中，位置稍微偏下方（距離底部 100 像素）
+    let startX = (canvas.width - totalWidthPx) / 2;
+    let startY = canvas.height - 100; 
+
+    A.x = startX;
+    A.y = startY;
+    B.x = startX + totalWidthPx;
+    B.y = startY;
 
     const isValid = (b_len + a_len > c_len);
 
@@ -194,7 +185,8 @@ function draw() {
         thetaD = Math.atan2(D.y - B.y, D.x - B.x);
     } else {
         let dist = Math.hypot(C.x - D.x, C.y - D.y);
-        if (dist < 50 && isValid && draggingPoint === null) {
+        let snapThreshold = Math.max(35, SCALE * 1.5);
+        if (dist < snapThreshold && isValid && draggingPoint === null) {
             isSnapped = true;
             let sol = solveTriangleAngles(a_len, b_len, c_len);
             thetaC = -sol.angleA;
@@ -215,16 +207,18 @@ function draw() {
         ctx.lineTo(B.x, B.y);
         ctx.lineTo(C.x, C.y);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(52, 152, 219, 0.12)';
+        ctx.fillStyle = 'rgba(52, 152, 219, 0.15)';
         ctx.fill();
     }
+
+    let lineWidth = Math.max(4, Math.min(12, SCALE * 0.15));
 
     // 1. 底邊 c
     ctx.beginPath();
     ctx.moveTo(A.x, A.y);
     ctx.lineTo(B.x, B.y);
     ctx.strokeStyle = colorAB;
-    ctx.lineWidth = 7;
+    ctx.lineWidth = lineWidth;
     ctx.stroke();
 
     // 2. 左側邊 b
@@ -232,7 +226,7 @@ function draw() {
     ctx.moveTo(A.x, A.y);
     ctx.lineTo(C.x, C.y);
     ctx.strokeStyle = colorAC;
-    ctx.lineWidth = 7;
+    ctx.lineWidth = lineWidth;
     ctx.stroke();
 
     // 3. 右側邊 a
@@ -240,52 +234,38 @@ function draw() {
     ctx.moveTo(B.x, B.y);
     ctx.lineTo(D.x, D.y);
     ctx.strokeStyle = colorBD;
-    ctx.lineWidth = 7;
+    ctx.lineWidth = lineWidth;
     ctx.stroke();
 
-    // 標註邊長與單位（字體進一步放大，並保持不重疊）
-    ctx.font = 'bold 28px Arial';
+    let fontSize = Math.max(16, Math.min(34, SCALE * 0.4));
+    ctx.font = `bold ${fontSize}px Arial`;
     ctx.textBaseline = 'middle';
     
     // 底邊標籤
     ctx.textAlign = 'center';
-    let midAB = { x: (A.x + B.x) / 2, y: A.y + 40 };
+    let midAB = { x: (A.x + B.x) / 2, y: A.y + fontSize * 1.3 };
     ctx.fillStyle = colorAB;
     ctx.fillText(`${c_len} 公分`, midAB.x, midAB.y);
 
     // 左側邊標籤
     ctx.textAlign = 'right';
-    let midAC = { x: (A.x + C.x) / 2 - 30, y: (A.y + C.y) / 2 - 15 };
+    let midAC = { x: (A.x + C.x) / 2 - 15, y: (A.y + C.y) / 2 - 10 };
     ctx.fillStyle = colorAC;
     ctx.fillText(`${b_len} 公分`, midAC.x, midAC.y);
 
     // 右側邊標籤
     ctx.textAlign = 'left';
-    let midBD = { x: (B.x + D.x) / 2 + 30, y: (B.y + D.y) / 2 - 15 };
+    let midBD = { x: (B.x + D.x) / 2 + 15, y: (B.y + D.y) / 2 - 10 };
     ctx.fillStyle = colorBD;
     ctx.fillText(`${a_len} 公分`, midBD.x, midBD.y);
-
-    // 下方資訊面板內容
-    let statusText = '';
-    if (isConnected && isValid) {
-        statusText = `<span class="valid">✔ 兩端點已自動接合，成功構成三角形！ (符合 b + a > c)</span><br>`;
-    } else if (!isValid) {
-        statusText = `<span class="invalid">✖ 兩側邊總和 (${b_len} + ${a_len} = ${b_len+a_len} 公分) 小於或等於底邊 (${c_len} 公分)，無法相交閉合！</span><br>`;
-    } else {
-        statusText = `<span class="invalid">✖ 兩端點未接合，請試著將兩側邊頂端互相靠近讓它們自動接合。</span><br>`;
-    }
-
-    statusText += `<hr style="border:0; border-top:1px solid #ddd; margin:12px 0;">`;
-    statusText += `邊長設定： <span style="color:${colorAC}">b = ${b_len} 公分</span> ， <span style="color:${colorBD}">a = ${a_len} 公分</span> ， <span style="color:${colorAB}">c = ${c_len} 公分</span><br>`;
-    statusText += `檢驗： b + a = ${b_len + a_len} 公分 ， 底邊 c = ${c_len} 公分 ➔ <strong>${b_len + a_len > c_len ? '兩邊和大於第三邊（可以組成三角形）' : '兩邊和小於或等於第三邊（無法組成三角形）'}</strong>`;
-
-    infoDiv.innerHTML = statusText;
 }
 
-canvas.addEventListener('mousedown', (e) => {
+function handleTouchOrMouse(clientX, clientY) {
+    let SCALE = getDynamicScale();
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    let scaleFactor = canvas.width / rect.width;
+    let mouseX = (clientX - rect.left) * scaleFactor;
+    let mouseY = (clientY - rect.top) * scaleFactor;
 
     let C = {
         x: A.x + b_len * SCALE * Math.cos(thetaC),
@@ -296,21 +276,29 @@ canvas.addEventListener('mousedown', (e) => {
         y: B.y + a_len * SCALE * Math.sin(thetaD)
     };
 
-    if (Math.hypot(C.x - mouseX, C.y - mouseY) < 35) {
+    // 關鍵修正：確保即使數字大、畫面縮小，點擊判定範圍依然足夠大（至少 35 像素以上）
+    let hitRadius = Math.max(35, b_len * SCALE * 0.2);
+
+    if (Math.hypot(C.x - mouseX, C.y - mouseY) < hitRadius) {
         draggingPoint = 'C';
         isSnapped = false; 
-    } else if (Math.hypot(D.x - mouseX, D.y - mouseY) < 35) {
+    } else if (Math.hypot(D.x - mouseX, D.y - mouseY) < hitRadius) {
         draggingPoint = 'D';
         isSnapped = false; 
     }
-});
+}
 
-canvas.addEventListener('mousemove', (e) => {
+canvas.addEventListener('mousedown', (e) => handleTouchOrMouse(e.clientX, e.clientY));
+canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 0) handleTouchOrMouse(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: true });
+
+function moveHandler(clientX, clientY) {
     if (!draggingPoint) return;
-
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    let scaleFactor = canvas.width / rect.width;
+    let mouseX = (clientX - rect.left) * scaleFactor;
+    let mouseY = (clientY - rect.top) * scaleFactor;
 
     if (draggingPoint === 'C') {
         thetaC = Math.atan2(mouseY - A.y, mouseX - A.x);
@@ -318,14 +306,23 @@ canvas.addEventListener('mousemove', (e) => {
         thetaD = Math.atan2(mouseY - B.y, mouseX - B.x);
     }
     draw();
-});
+}
 
-window.addEventListener('mouseup', () => {
-    draggingPoint = null;
+canvas.addEventListener('mousemove', (e) => moveHandler(e.clientX, e.clientY));
+canvas.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 0) moveHandler(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: true });
+
+window.addEventListener('mouseup', () => { draggingPoint = null; draw(); });
+window.addEventListener('touchend', () => { draggingPoint = null; draw(); });
+
+window.addEventListener('resize', () => {
     draw();
 });
 
-initSides();
+window.onload = () => {
+    initSides();
+};
 </script>
 
 </body>
